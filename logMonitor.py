@@ -4,7 +4,7 @@ import os
 import datetime
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
-
+import re
 
 class LogMonitor:
 	
@@ -44,24 +44,55 @@ class LogMonitor:
 				findError = line.find(' ERROR ')
 				
 				if(findError > -1):
-					self.emailError(line)
+					self.formatText(line)
+					
 					
 		main() #restart the program to get the new logfile name
 		
+	def formatText(self,error):
+
+		regex = '([0-9]:[0-9]{2}:[0-9]{2} [AaPp][Mm] \[[#0-9])'
+		startOfLine = re.findall(regex, error)
+		findIndex = 0;
+		matchesIndexes = []
+		for x in startOfLine:
+			findLineBreak = error.find(x,findIndex)
+			findIndex = findLineBreak+2
+			matchesIndexes.append(findLineBreak)
+			
+		findErrorIndex = error.find(' ERROR ')
+		errorFormatted = ''
+		bolded = '0'
+
+		for x in range(len(matchesIndexes)):
+			if(x < len(matchesIndexes) -1):
+				stringyy = error[matchesIndexes[x]:matchesIndexes[x+1]]
+				if(matchesIndexes[x+1] > findErrorIndex and bolded != '2' and findErrorIndex > -1):
+					bolded = '1'
+			else:
+				stringyy = error[matchesIndexes[x]:]
+			
+			style = "margin:0"
+			if(bolded == '1'):
+				bolded = '2'
+				style = "margin:0; font-weight: bold; color: red;"
+			errorFormatted += '<p style="'+style+'">' +stringyy + '</p>'
+	
+		self.emailError(errorFormatted)
+		
 	def emailError(self, error):
-		print(error)
 		message = Mail(
 			from_email='iparadoxloger@noone.ca',
 			to_emails='eli.turkmani@soth.ca',
 			subject='iparadox error detected',
-			html_content='<strong>'+error+'</strong>'
+			html_content=error
 			)
 		try:
 			sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
 			response = sg.send(message)
-			print(response.status_code)
-			print(response.body)
-			print(response.headers)
+			#print(response.status_code)
+			#print(response.body)
+			#print(response.headers)
 		except Exception as e:
 			print(e.message)
 
@@ -77,7 +108,8 @@ def getFileName():
 	
 	
 def main():
-	
+	print('IPARADOX LOG MONITORING STARTED..')
+	print('LISTENING FOR ERRORS...')
 	if(len(sys.argv) < 2):
 		script_dir = os.path.dirname(os.path.abspath(__file__)) #<-- absolute dir the script is in
 		fileName = getFileName()
@@ -89,11 +121,12 @@ def main():
 		file = open(filePath,'r')
 		logMonitor = LogMonitor()
 		logMonitor.tailLog(file)
+		#logMonitor.formatText('')
+		#testString()
 	except IOError:
 		print('file not accessible')
 		time.sleep(10)
 		main()
-
 
 if __name__ == '__main__':
 	main()
@@ -104,35 +137,7 @@ else:
 		
 		
 		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
+
 		
 ''' def myfunc(n):
   return lambda a : a * n
